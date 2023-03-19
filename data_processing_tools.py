@@ -243,7 +243,7 @@ def get_residuals(data,skl_model,trained):
     return residuals
 
 #Tests for correlation between two scalar variables.
-#covariance = SUM((xi - avgi)(yj - avgj))/n
+#covariance = SUM((xi - avgi)(yj - avgj))/n.
 #   Input: The dataframe, the name of the first column, the name of the column to compare against the first.
 #   Output: The covariance of the two given columns.
 def areScalarVariablesCorrelated(data,varA,varB):
@@ -262,3 +262,170 @@ def areScalarVariablesCorrelated(data,varA,varB):
         total_sum = total_sum + (var1[i] - avg1)*(var2[i] - avg2)
     
     return total_sum/len(var1)
+
+#Creates a correlation matrix for the scalable variables, defined specifically in func.
+#   Input: The dataframe.
+#   Output: The correlation matrix as a dataframe.
+def scalarCorrelationMatrix(data):
+    scalar_columns = ['Posted On','BHK','Size','Bathroom','Floor On','Floor Out Of']
+
+    data_columns = data.columns
+    
+    for i in scalar_columns:
+        if not i in data.columns:
+            scalar_columns.remove(i)
+    
+    correlation_columns = []
+
+    for i in scalar_columns:
+        list_column = []
+        for j in scalar_columns:
+            list_column.append(areScalarVariablesCorrelated(data,i,j))
+        correlation_columns.append(pd.Series(list_column,name=i,dtype='float64'))
+
+    correlation_frame = pd.concat(correlation_columns,axis=1)
+    correlation_frame.index = scalar_columns
+    
+    return correlation_frame
+
+#Scales 'Bathroom' to be total utility rooms (or 'BKH' + 'Bathroom') 
+#divided by the square footage, then drops 'BHK'.
+#   Input: Dataframe.
+#   Output: Dataframe with scaled 'Bathroom' and dropped 'BHK'.
+def sizeBathroomBHKScale(data):
+    #First scale Bathroom and BHK by Size
+    data.Bathroom = data.Bathroom.astype("float32",copy=True)
+    data.BHK = data.BHK.astype("float32",copy=True)
+    
+    for i in range(len(data.Bathroom)):
+        data.loc[data.Size == 0,'Size'] = 1
+        data.Bathroom = data.Bathroom + data.BHK
+        data.Bathroom = data.Bathroom / data.Size
+
+    data = data.drop("BHK",axis=1)
+    
+    return data
+
+#Returns the correlation between each of the categorical variables.
+#   Input: Dataframe, and a list of strings representing the categorical variables if they differ from the usual needed.
+#   Output: A list of lists with the format [crosstab,test_results,expected].
+def getCatCorrelation(data,cat_vars = ["Area Type","Furnishing Status","Point of Contact","Bachelors","Family",
+            "Bangalore","Chennai","Delhi","Hyderabad","Kolkata","Mumbai"]):
+    result_holder = []
+    for i in cat_vars:
+        #cat_holder.append(data[i].value_counts())
+        for j in cat_vars:
+            crosstab, test_results, expected = rp.crosstab(data[i], data[j],
+                                               test= "chi-square",
+                                               expected_freqs= True,
+                                               prop= "cell")
+            result_holder.append([crosstab,test_results,expected])
+        
+    return result_holder
+
+#Returns a correlation matrix given the results of getCatCorrelation,
+#and contains correlation strength based on cutoffs for coloring.
+#   Input: Results of getCatCorrelation().
+#   Output: Correlation matrix.
+def catCorrMatrix(catCorrResults):
+    corr_strength = pd.DataFrame()
+    corr_strength_constructor = []
+
+    #n is the starting point (index wise) for the current var
+    n = 0
+    interp = False
+    for i in range(len(cat_vars)): 
+        corr_strength_helper = []
+        for j in range(len(cat_vars)):
+            if interp:
+                if abs(result[n+j][1]['results'][2]) > .25:
+                    #print("Very Strong")
+                    corr_strength_helper.append('VS')
+                elif abs(result[n+j][1]['results'][2]) > .15:
+                    #print("Strong")
+                    corr_strength_helper.append('S')
+                elif abs(result[n+j][1]['results'][2]) > .1:
+                    #print("Moderate")
+                    corr_strength_helper.append('M')
+                elif abs(result[n+j][1]['results'][2]) > .05:
+                    #print("Weak")
+                    corr_strength_helper.append('W')
+                else:
+                    #print("None or Very Weak")
+                    corr_strength_helper.append('N')
+            else:
+                corr_strength_helper.append(result[n+j][1]['results'][2])
+
+        corr_strength_helper = pd.Series(corr_strength_helper,name=cat_vars[i])
+        corr_strength = pd.concat([corr_strength,corr_strength_helper],axis=1)
+
+        n = n + len(cat_vars)
+
+    corr_strength.index = cat_vars
+    
+    return corr_strength
+
+#Function to be used by dataframe.style.apply() for coloring frame.
+#   Input: Correlation matrix for cat variables.
+#   Output: Boolean based on what conditions were satisfied.
+def highlightS(x,color):
+    ones = np.where(x > .99, "color: white;", None)
+    s = np.where(x > .2, f"color: {color};", None)
+    vs = np.where(x > .5, "color: blue;", None)
+    for i in range(len(vs)):
+        if ones[i] == None:
+            if not s[i] == None:
+                if vs[i] == None:
+                    vs[i] = s[i]
+        else:
+            vs[i] = ones[i]
+    return vs
+
+#Function to be used by dataframe.style.apply() for hiding uninformative parts of frame.
+#   Input: Correlation matrix for cat variables.
+#   Output: Boolean based on what conditions were satisfied.
+def highlightN(x,color):
+    return np.where((x == "N"), f"color: {color};", None)
+
+#display(corr_strength.style.apply(highlightS,color="green"))
+
+#Combines all heavily collinear cities into a single column 'InSimilarCities'.
+#   Input: Dataframe.
+#   Output: Refactored dataframe.
+def consolidateCitiesIntoSimilarEffect(data):
+    for i in ["Bangalore","Chennai","Hyderabad","Delhi"]:
+        data.loc[data[i] == 1,'Delhi'] = 1
+        
+    data = data.drop("Bangalore",axis=1)
+    data = data.drop("Chennai",axis=1)
+    data = data.drop("Hyderabad",axis=1)
+    data = data.drop("Kolkata",axis=1)
+    
+    data = data.rename(columns={"Delhi":"InSimilarCities"})
+    
+    return data
+
+#Removes data points over two standard deviations away from the mean of a continous variable.
+#   Input: Dataframe, and column to prune unless column is 'Rent'.
+#   Output: Adjusted dataframe.
+def removeContinuousOutliers(column="Rent"):
+    col = column
+    sample_mean = np.mean(data[col],axis=0)
+    sample_std_dev = np.std(data[col],axis=0)
+    row_pointer = 0
+    for row in range(len(data)):
+        safe = True
+        val = data.iloc[row_pointer][col]
+        if val <= sample_mean - 2 * sample_std_dev:
+            safe = False
+        elif val >= sample_mean + 2 * sample_std_dev:
+            safe = False
+
+        if not safe:
+            data = data.drop(row,axis=0)
+            row_pointer = row_pointer - 1
+
+        row_pointer = row_pointer + 1
+    data.reset_index(drop=True)
+
+    return data
