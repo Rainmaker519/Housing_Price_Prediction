@@ -143,3 +143,122 @@ def drop_built_area(data):
     return data
 
 ### STOPPED MOVING OVER BEFORE FUNCTIONS FOR CHECKING LINEAR RELATIONSHIPS ###
+
+#Checks whether a linear relationship exists between the provided column and 'Rent'.
+#   Input: The name of the column to compare against 'Rent' as a string.
+#   Output: True if doesn't fail, displays a graph of the relationship.
+def check_linear_relationship(compare_from):
+    compare_col = compare_from
+    theta = np.polyfit(data[compare_col], data['Rent'],1)
+    y_line = theta[1] + theta[0] * data[compare_col]
+    plt.scatter(data[compare_col], data['Rent'], color='red')
+    plt.plot(data[compare_col], y_line, 'b')
+    plt.title('Rent Vs ' + str(compare_col), fontsize=14)
+    plt.xlabel(compare_col, fontsize=14)
+    plt.ylabel('Rent', fontsize=14)
+    plt.grid(True)
+    plt.show()
+    print("The slope of the best fit for", compare_col, "is " + str(theta[0]))
+
+    return True
+
+#Shows how the MFE changes as each column is added until all columns are used.
+#PCA used each time to mitigate collinearity and allow the number of features to be consistent over tests.
+#   Input: A pandas dataframe, the type of model/regression to use, and the number of repeats to reduce potential outlier runs.
+#   Output: True given no errors thrown, and shows the pyplot of the results.
+def validate(data,reg_type="linear_regression",repeats=3):
+    columns = data.columns
+    X = data[columns]
+    y = np.ravel(data[["Rent"]])
+    X = X.drop("Rent",axis=1)
+    num_points = len(data)
+    
+    pca = PCA()
+    X_reduced = pca.fit_transform(scale(X))
+    
+    cv = RepeatedKFold(n_splits=10, n_repeats=repeats, random_state=1)
+    
+    if reg_type == 'linear':
+        regr = LinearRegression()
+    elif reg_type == 'random_forest':
+        regr = RandomForestRegressor()
+    elif reg_type == 'lasso':
+        regr = Lasso()
+    else:
+        print("you need a valid regression type for pca")
+        return
+    mse = []
+    
+    score = -1*model_selection.cross_val_score(regr,
+           np.ones((len(X_reduced),1)), y, cv=cv,
+           scoring='neg_mean_squared_error').mean()  
+    mse.append(score/num_points)
+    
+    for i in np.arange(1, len(data.columns)):
+        score = -1*model_selection.cross_val_score(regr,
+               X_reduced[:,:i], y, cv=cv, scoring='neg_mean_squared_error').mean()
+        mse.append(score/num_points)
+        
+    plt.plot(mse)
+    plt.xlabel('Number of Used Components')
+    plt.ylabel('Total MSE / Number of Rows')
+    plt.title('Rent')
+    display(mse)
+    
+    return True
+
+#Gives the residuals for a regression as a list.
+#   Input: The dataframe, a sklearn model, and a boolean representing whether or not the model has been trained.
+#   Output: A list of residuals from the regression's predicted rent to the actual rent.
+def get_residuals(data,skl_model,trained):
+    y = data["Rent"]
+    X = data.drop("Rent",axis=1)
+    X_train = X[:int(len(X)*.7)]
+    y_train = y[:int(len(X)*.7)]
+    X_test = X[int(len(X)*.7):]
+    y_test = y[int(len(X)*.7):]
+    
+    
+    X_train = X_train.reset_index()
+    X_test = X_test.reset_index()
+    y_train = y_train.reset_index()
+    y_test = y_test.reset_index()
+    
+    
+    if not trained:
+        skl_model.fit(X_train,y_train)
+    
+    full_predictions = skl_model.predict(X_test)
+    predictions = []
+    residuals = []
+    
+    y_test = y_test.drop("index",axis=1)
+    
+    for i in range(len(full_predictions)):
+        predictions.append(full_predictions[i][1])
+    
+    for i in range(len(predictions)):
+        residuals.append(abs(predictions[i] - y_test["Rent"][i]))
+           
+    return residuals
+
+#Tests for correlation between two scalar variables.
+#covariance = SUM((xi - avgi)(yj - avgj))/n
+#   Input: The dataframe, the name of the first column, the name of the column to compare against the first.
+#   Output: The covariance of the two given columns.
+def areScalarVariablesCorrelated(data,varA,varB):
+    var1 = scale(data[varA])
+    var2 = scale(data[varB])
+    
+    avg1 = var1.mean()
+    avg2 = var2.mean()
+    
+    if len(var1) != len(var2):
+        print("Please use variables with the same number of entries.")
+        return None
+    
+    total_sum = 0
+    for i in range(len(var1)):
+        total_sum = total_sum + (var1[i] - avg1)*(var2[i] - avg2)
+    
+    return total_sum/len(var1)
