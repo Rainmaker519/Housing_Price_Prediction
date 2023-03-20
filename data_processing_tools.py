@@ -5,6 +5,26 @@ from pandas.api.types import CategoricalDtype
 
 from sklearn.preprocessing import OneHotEncoder
 
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import Lasso
+
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import scale
+from sklearn.model_selection import RepeatedKFold
+from sklearn import model_selection
+
+from IPython.display import display
+
+import researchpy as rp
+
+
+
+
+
 #Helper function for dateSplit.
 #   Input: A list of strings in the form "2022-01-01".
 #   Output: A list of lists in the form [2022, 01, 01].
@@ -145,9 +165,9 @@ def drop_built_area(data):
 ### STOPPED MOVING OVER BEFORE FUNCTIONS FOR CHECKING LINEAR RELATIONSHIPS ###
 
 #Checks whether a linear relationship exists between the provided column and 'Rent'.
-#   Input: The name of the column to compare against 'Rent' as a string.
+#   Input: Dataframe, and the name of the column to compare against 'Rent' as a string.
 #   Output: True if doesn't fail, displays a graph of the relationship.
-def check_linear_relationship(compare_from):
+def check_linear_relationship(data,compare_from):
     compare_col = compare_from
     theta = np.polyfit(data[compare_col], data['Rent'],1)
     y_line = theta[1] + theta[0] * data[compare_col]
@@ -309,8 +329,7 @@ def sizeBathroomBHKScale(data):
 #Returns the correlation between each of the categorical variables.
 #   Input: Dataframe, and a list of strings representing the categorical variables if they differ from the usual needed.
 #   Output: A list of lists with the format [crosstab,test_results,expected].
-def getCatCorrelation(data,cat_vars = ["Area Type","Furnishing Status","Point of Contact","Bachelors","Family",
-            "Bangalore","Chennai","Delhi","Hyderabad","Kolkata","Mumbai"]):
+def getCatCorrelation(data,cat_vars):
     result_holder = []
     for i in cat_vars:
         #cat_holder.append(data[i].value_counts())
@@ -327,7 +346,8 @@ def getCatCorrelation(data,cat_vars = ["Area Type","Furnishing Status","Point of
 #and contains correlation strength based on cutoffs for coloring.
 #   Input: Results of getCatCorrelation().
 #   Output: Correlation matrix.
-def catCorrMatrix(catCorrResults):
+def catCorrMatrix(catCorrResults,cat_vars):
+    result = catCorrResults
     corr_strength = pd.DataFrame()
     corr_strength_constructor = []
 
@@ -429,3 +449,6 @@ def removeContinuousOutliers(column="Rent"):
     data.reset_index(drop=True)
 
     return data
+
+if __name__ == "__main__":
+    print("This file is meant to be used as a library.")
