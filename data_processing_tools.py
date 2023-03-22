@@ -162,6 +162,26 @@ def drop_built_area(data):
 
     return data
 
+#This function is used to drop all rows with 'Contact Builder' as the 'Point of Contact'.
+#   Input: A dataframe.
+#   Output: The dataframe with all rows with 'Contact Builder' as the 'Point of Contact' dropped, and the index reset.
+def drop_contact_builder(data):
+    data = data.drop(data[data['Point of Contact'] == 'Contact Builder'].index)
+    data = data.reset_index()
+
+    return data
+
+#This function is used to set the data type of all columns to integers.
+#Do NOT use this function on columns that contain strings, as in the case that this is called before the other preprocessing methods.
+#   Input: A dataframe.
+#   Output: The dataframe with all column types set to integers.
+def ensure_all_integer(data):
+    columns = data.columns
+    for i in columns:
+        data[i] = data[i].astype(int)
+
+    return data
+
 ### STOPPED MOVING OVER BEFORE FUNCTIONS FOR CHECKING LINEAR RELATIONSHIPS ###
 
 #Checks whether a linear relationship exists between the provided column and 'Rent'.
