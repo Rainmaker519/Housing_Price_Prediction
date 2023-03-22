@@ -22,8 +22,30 @@ from IPython.display import display
 import researchpy as rp
 
 
+def getColumnDescriptionDict(data):
+    columns = list(data.columns)
+    column_to_description = {}
 
+    descriptions_temp = ["Posted On: The date on which the house listing was posted.",
+    "BHK: Number of Bedrooms, Hall, Kitchen.",
+    "Rent: Rent of the Houses/Apartments/Flats.",
+    "Size: Size of the Houses/Apartments/Flats in Square Feet.",
+    "Floor: Houses/Apartments/Flats situated in which Floor and Total Number of Floors (Example: Ground out of 2, 3 out of 5, etc.)",
+    "Area Type: Size of the Houses/Apartments/Flats calculated on either Super Area or Carpet Area or Build Area.",
+    "Area Locality: Locality of the Houses/Apartments/Flats.",
+    "City: City where the Houses/Apartments/Flats are Located.",
+    "Furnishing Status: Furnishing Status of the Houses/Apartments/Flats, either it is Furnished or Semi-Furnished or Unfurnished.",
+    "Tenant Preferred: Type of Tenant Preferred by the Owner or Agent.",
+    "Bathroom: Number of Bathrooms.",
+    "Point of Contact: Whom should you contact for more information regarding the Houses/Apartments/Flats."]
 
+    for i in range(len(list(data.columns))):
+        column_to_description[columns[i]] = descriptions_temp[i]
+                                    
+    for i in columns:
+        print(column_to_description[i])
+
+    return column_to_description
 
 #Helper function for dateSplit.
 #   Input: A list of strings in the form "2022-01-01".
@@ -56,6 +78,29 @@ def postedtoscalar_numberOfDays(y, m):
       if m in list:
          return 31
       return 30
+
+#This function is used to convert 'Posted On' into a scalar value.
+#   Input: A dataframe
+#   Output: The dataframe with the 'Posted On' string converted into a scalar value by using the number of days since 2022-01-01.
+def updatePostedOnToScalar(data):
+    split_dates = postedtoscalar_dateSplit(data["Posted On"])
+    list_of_date_num_equivalent = []    
+    
+    for i in range(len(split_dates)):
+        date_num_equivalent = 0
+        
+        for j in range(int(split_dates[i][1])):
+            date_num_equivalent = date_num_equivalent + postedtoscalar_numberOfDays(int(split_dates[i][0]),j)
+            
+        date_num_equivalent = date_num_equivalent + int(split_dates[i][2])
+        
+        list_of_date_num_equivalent.append(date_num_equivalent)
+        
+    list_of_date_num_equivalent = np.array(list_of_date_num_equivalent)
+        
+    data["Posted On"] = list_of_date_num_equivalent
+
+    return data
 
 #This function is used to convert 'Floor' into two columns 'Floor On' and 'Floor Out Of'
 #   Input: A dataframe
@@ -469,6 +514,21 @@ def removeContinuousOutliers(column="Rent"):
     data.reset_index(drop=True)
 
     return data
+
+def clean_data(data):
+    data = updatePostedOnToScalar(data)
+    return
+
+#Returns a dataframe with the PCA components from the X data, and the PCA object used for it.
+#   Input: X data.
+#   Output: X data with PCA components, and the PCA object used for it.
+def use_pca(X):
+    pca = PCA()
+    X_reduced = pca.fit_transform(scale(X))
+    return X_reduced,pca
+
+def process_data(data):
+    return
 
 if __name__ == "__main__":
     print("This file is meant to be used as a library.")
